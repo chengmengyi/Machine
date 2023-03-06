@@ -2,10 +2,16 @@ package com.demo.newvpn.app
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import com.demo.newvpn.R
+
+
+fun maLog(string: String){
+    Log.e("qwer",string)
+}
 
 fun getServerLogo(name:String)=when(name){
     "Australia"->R.drawable.australia

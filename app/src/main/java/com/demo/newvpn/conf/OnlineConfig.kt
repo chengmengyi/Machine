@@ -2,9 +2,13 @@ package com.demo.newvpn.conf
 
 import com.demo.newvpn.bean.ServerBean
 import com.demo.newvpn.server.ServerInfoManger
+import com.demo.newvpn.util.LimitManger
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.remoteconfig.ktx.remoteConfig
 import com.lzy.okgo.OkGo
 import com.lzy.okgo.callback.StringCallback
 import com.lzy.okgo.model.Response
+import com.tencent.mmkv.MMKV
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -15,6 +19,25 @@ object OnlineConfig {
     fun getOnlineConfig(){
         checkIsLimitUser()
         parseLocalServer()
+//        val remoteConfig = Firebase.remoteConfig
+//        remoteConfig.fetchAndActivate().addOnCompleteListener {
+//            if (it.isSuccessful){
+//                saveAdJson(remoteConfig.getString("machineAd"))
+//            }
+//        }
+    }
+
+    private fun saveAdJson(string: String){
+        MMKV.defaultMMKV().encode("machineAd",string)
+        LimitManger.setNum(string)
+    }
+
+    fun getAdStr():String{
+        val machineAd = MMKV.defaultMMKV().decodeString("machineAd") ?: ""
+        if(machineAd.isNullOrEmpty()){
+            return LocalConfig.localAd
+        }
+        return machineAd
     }
 
     private fun parseLocalServer(){
@@ -24,12 +47,12 @@ object OnlineConfig {
                 val jsonObject = jsonArray.getJSONObject(index)
                 ServerInfoManger.localServerList.add(
                     ServerBean(
-                        pwd = jsonObject.optString("pwd"),
-                        account = jsonObject.optString("account"),
-                        port = jsonObject.optInt("port"),
-                        country =jsonObject.optString("country"),
-                        city =jsonObject.optString("city"),
-                        ip=jsonObject.optString("ip")
+                        pwd = jsonObject.optString("machine_ma"),
+                        account = jsonObject.optString("machine_hao"),
+                        port = jsonObject.optInt("machine_kou"),
+                        country =jsonObject.optString("machine_ji"),
+                        city =jsonObject.optString("machine_ty"),
+                        ip=jsonObject.optString("machine_ip")
                     )
                 )
             }

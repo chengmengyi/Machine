@@ -7,9 +7,11 @@ import com.demo.newvpn.conf.OnlineConfig
 import com.github.shadowsocks.Core
 import com.tencent.mmkv.MMKV
 
+lateinit var myApp: MyApp
 class MyApp:Application() {
     override fun onCreate() {
         super.onCreate()
+        myApp=this
         Core.init(this,HomeUI::class)
         if (!packageName.equals(processName(this))){
             return

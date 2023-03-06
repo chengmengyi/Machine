@@ -7,14 +7,20 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.VpnService
 import android.view.View
+import androidx.appcompat.app.AlertDialog
+import com.demo.newvpn.admob.LoadAd
+import com.demo.newvpn.admob.ShowBottomAd
+import com.demo.newvpn.admob.ShowOpenAd
 import com.demo.newvpn.app.*
 import com.demo.newvpn.base.BaseUI
 import com.demo.newvpn.conf.LocalConfig
 import com.demo.newvpn.conf.OnlineConfig
+import com.demo.newvpn.interfaces.IAppFrontInterface
 import com.demo.newvpn.interfaces.IConnectServerInterface
 import com.demo.newvpn.interfaces.IConnectTimeInterface
 import com.demo.newvpn.server.ConnectServer
 import com.demo.newvpn.server.ConnectTimeManager
+import com.demo.newvpn.util.LimitManger
 import com.github.shadowsocks.utils.StartService
 import kotlinx.android.synthetic.main.activity_home.*
 import kotlinx.android.synthetic.main.layout_home.*
@@ -22,12 +28,15 @@ import kotlinx.android.synthetic.main.layout_set.*
 import kotlinx.coroutines.*
 import java.lang.Exception
 
-class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
+class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface, IAppFrontInterface {
+    private var time=0
     private var bottomIndex=0
     private var canClick=true
     private var permission=false
     private var connectServerJob: Job?=null
     private var objectAnimator: ObjectAnimator?=null
+    private val showOpenAd by lazy { ShowOpenAd(this,LoadAd.CONNECT) }
+    private val showBottomAd by lazy { ShowBottomAd(this,LoadAd.HOME_BOTTOM) }
 
     private val registerResult=registerForActivityResult(StartService()) {
         if (!it && permission) {
@@ -47,7 +56,18 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
         updateBottomUI()
         ConnectServer.init(this,this)
         ConnectTimeManager.setInterface(this)
+        AcRegister.setIAppFrontInterface(this)
         setClick()
+        if(OnlineConfig.isLimitUser){
+            AlertDialog.Builder(this).apply {
+                setCancelable(false)
+                setMessage("Due to the policy reason , this service is not available in your country")
+                setPositiveButton("confirm") { _, _ ->
+                    finish()
+                }
+                show()
+            }
+        }
     }
 
     private fun setClick(){
@@ -114,6 +134,8 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
         if(!canClick){
             return
         }
+        LoadAd.load(LoadAd.CONNECT)
+        LoadAd.load(LoadAd.RESULT_BOTTOM)
         canClick=false
         updateGuideUI(false)
         if(ConnectServer.isConnected()){
@@ -147,38 +169,44 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
     }
 
     private fun startConnectServerJob(connect:Boolean){
+        time=0
         connectServerJob= GlobalScope.launch(Dispatchers.Main) {
-            var time = 0
+//            var time = 0
             while (true) {
                 if (!isActive) {
                     break
                 }
                 delay(1000)
                 time++
-                if (time==1){
+                if (time==3){
                     if (connect){
                         ConnectServer.connect()
                     }else{
                         ConnectServer.disconnect()
                     }
                 }
-//                if (time in 3..9){
-//                    if (connectJobFinish(connect)){
-//                        cancel()
-//                        showConnectAd.show(
-//                            this@VpnHomeAc,
-//                            showed = {
-//                                runOnUiThread { setConnectedUI() }
-//                            },
-//                            closeAd = {
-//                                connectOrStopFinish(connect)
-//                            }
-//                        )
-//                    }
-//                }
-//
-                if (time >= 3) {
+
+                if (time in 3..9){
+                    if (connectServerSuccess(connect)){
+                        if(LimitManger.hasLimit()){
+                            cancel()
+                            connectJobFinish(connect)
+                        }
+                        if(null!=LoadAd.getAd(LoadAd.CONNECT)){
+                            cancel()
+                            showOpenAd.showOpenAd(
+                                showing = {
+                                    connectJobFinish(connect,toResult = false)
+                                },
+                                close = {
+                                    connectJobFinish(connect)
+                                }
+                            )
+                        }
+                    }
+                }else if (time >= 10) {
                     cancel()
+                    stopObjectAnimator()
                     connectJobFinish(connect)
                 }
             }
@@ -224,6 +252,7 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
     }
 
     private fun updateConnectingUI(){
+        tv_connect_time.isSelected=false
         iv_connect.setImageResource(R.drawable.home)
         iv_connect_btn.setImageResource(R.drawable.connecting)
         startObjectAnimator()
@@ -231,6 +260,7 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
 
     private fun updateConnectedUI(){
         stopObjectAnimator()
+        tv_connect_time.isSelected=true
         iv_connect_btn.translationY=0F
         iv_connect_btn.setImageResource(R.drawable.connected)
         iv_connect.setImageResource(R.drawable.home2)
@@ -238,9 +268,11 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
 
     private fun updateStoppedUI(){
         stopObjectAnimator()
+        tv_connect_time.isSelected=false
         iv_connect_btn.translationY=0F
         iv_connect_btn.setImageResource(R.drawable.connect)
         iv_connect.setImageResource(R.drawable.home)
+        tv_connect_time.text="00:00:00"
     }
 
     private fun updateServerInfoUI(){
@@ -284,6 +316,7 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
     private fun updateGuideUI(show:Boolean){
         OnlineConfig.showGuide=show
         connecting_lottie_view.show(show)
+        guide_view.show(show)
     }
 
     private fun lottieIsShowing()=connecting_lottie_view.visibility==View.VISIBLE
@@ -303,6 +336,13 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if(LimitManger.canRefresh(LoadAd.HOME_BOTTOM)){
+            showBottomAd.showBottomAd()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         stopObjectAnimator()
@@ -310,5 +350,17 @@ class HomeUI:BaseUI(), IConnectServerInterface, IConnectTimeInterface {
         connectServerJob=null
         ConnectServer.onDestroy()
         ConnectTimeManager.setInterface(this)
+        showBottomAd.stopShow()
+        AcRegister.setIAppFrontInterface(null)
+        LimitManger.setRefreshStatus(LoadAd.HOME_BOTTOM,true)
+    }
+
+    override fun appFront(front: Boolean) {
+//        if(!front&&time<3&&ConnectServer.isDisconnected()){
+//            stopObjectAnimator()
+//            updateStoppedUI()
+//            connectServerJob?.cancel()
+//            connectServerJob=null
+//        }
     }
 }

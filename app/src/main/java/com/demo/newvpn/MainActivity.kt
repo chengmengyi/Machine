@@ -6,24 +6,46 @@ import android.view.KeyEvent
 import android.view.animation.LinearInterpolator
 import androidx.core.animation.doOnEnd
 import com.blankj.utilcode.util.ActivityUtils
+import com.demo.newvpn.admob.LoadAd
+import com.demo.newvpn.admob.ShowOpenAd
 import com.demo.newvpn.base.BaseUI
+import com.demo.newvpn.util.LimitManger
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : BaseUI() {
     private var animator:ValueAnimator?=null
 
+    private val showOpenAd by lazy {  ShowOpenAd(this,LoadAd.OPEN) }
+
     override fun layout(): Int = R.layout.activity_main
 
     override fun initView() {
+
+        LimitManger.resetRefresh()
+        LimitManger.readNum()
+        LoadAd.preLoad()
+
         animator = ValueAnimator.ofInt(0, 100).apply {
-            duration = 3000L
+            duration = 10000L
             interpolator = LinearInterpolator()
             addUpdateListener {
                 val progress = it.animatedValue as Int
                 progress_view.progress = progress
-//                val pro = (10 * (progress / 100.0F)).toInt()
+                val pro = (10 * (progress / 100.0F)).toInt()
+                if(pro in 2..9){
+                    showOpenAd.showOpenAd(
+                        showing = {
+                            stopAnimator()
+                            progress_view.progress = 100
+                        },
+                        close = {
+                            toHome()
+                        }
+                    )
+                }else if (pro>=10){
+                    toHome()
+                }
             }
-            doOnEnd { toHome() }
             start()
         }
     }

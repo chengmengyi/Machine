@@ -5,7 +5,10 @@ import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import com.blankj.utilcode.util.ActivityUtils
+import com.demo.newvpn.HomeUI
 import com.demo.newvpn.MainActivity
+import com.demo.newvpn.interfaces.IAppFrontInterface
+import com.google.android.gms.ads.AdActivity
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -13,8 +16,9 @@ import kotlinx.coroutines.launch
 
 object AcRegister {
     var isFront=true
-//    private var jumpToMain=false
+    private var hotReload=false
     private var job: Job?=null
+    private var iAppFrontInterface:IAppFrontInterface?=null
 
     fun register(application: Application){
         application.registerActivityLifecycleCallbacks(callback)
@@ -30,14 +34,13 @@ object AcRegister {
             job=null
             if (pages==1){
                 isFront=true
-//                if (jumpToMain&&!banReload){
-//                    if (ActivityUtils.isActivityExistsInStack(HomeAc::class.java)){
-//                        activity.startActivity(Intent(activity, MainActivity::class.java).apply {
-//                            putExtra("isColdLoad",false)
-//                        })
-//                    }
-//                }
-//                jumpToMain=false
+                iAppFrontInterface?.appFront(true)
+                if (hotReload){
+                    if (ActivityUtils.isActivityExistsInStack(HomeUI::class.java)){
+                        activity.startActivity(Intent(activity, MainActivity::class.java))
+                    }
+                }
+                hotReload=false
             }
         }
 
@@ -49,19 +52,22 @@ object AcRegister {
             pages--
             if (pages<=0){
                 isFront=false
-//                ActivityUtils.finishActivity(SecurityAc::class.java)
-//                ActivityUtils.finishActivity(NetTestAc::class.java)
-//                job= GlobalScope.launch {
-//                    delay(3000L)
-//                    jumpToMain=true
-//                    ActivityUtils.finishActivity(MainActivity::class.java)
-//                    ActivityUtils.finishActivity(AdActivity::class.java)
-//                }
+                iAppFrontInterface?.appFront(false)
+                job= GlobalScope.launch {
+                    delay(3000L)
+                    hotReload=true
+                    ActivityUtils.finishActivity(MainActivity::class.java)
+                    ActivityUtils.finishActivity(AdActivity::class.java)
+                }
             }
         }
 
         override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
 
         override fun onActivityDestroyed(activity: Activity) {}
+    }
+
+    fun setIAppFrontInterface(iAppFrontInterface:IAppFrontInterface?){
+        this.iAppFrontInterface=iAppFrontInterface
     }
 }

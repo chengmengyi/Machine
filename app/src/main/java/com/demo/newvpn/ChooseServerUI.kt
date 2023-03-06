@@ -4,17 +4,20 @@ import android.content.Intent
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.demo.newvpn.adapter.ServerAdapter
+import com.demo.newvpn.admob.LoadAd
+import com.demo.newvpn.admob.ShowOpenAd
 import com.demo.newvpn.base.BaseUI
 import com.demo.newvpn.bean.ServerBean
 import com.demo.newvpn.server.ConnectServer
-import com.github.shadowsocks.bg.BaseService
 import kotlinx.android.synthetic.main.activity_choose_server.*
 
 class ChooseServerUI:BaseUI() {
+    private val showOpenAd by lazy { ShowOpenAd(this,LoadAd.BACK) }
 
     override fun layout(): Int = R.layout.activity_choose_server
 
     override fun initView() {
+        LoadAd.load(LoadAd.BACK)
         immersionBar.statusBarView(top).init()
         rv_list.apply {
             layoutManager=LinearLayoutManager(this@ChooseServerUI)
@@ -28,7 +31,7 @@ class ChooseServerUI:BaseUI() {
         val connected = ConnectServer.isConnected()
         if(connected&&current.ip!=serverBean.ip){
             AlertDialog.Builder(this).apply {
-                setMessage("You are currently connected and need to disconnect before manually connecting to the server.")
+                setMessage("If you want to connect to another VPN, you need to disconnect the current connection first. Do you want to disconnect the current connection?")
                 setPositiveButton("sure") { _, _ ->
                     chooseBack(serverBean,"duankai")
                 }
@@ -53,6 +56,12 @@ class ChooseServerUI:BaseUI() {
     }
 
     override fun onBackPressed() {
-        finish()
+        showOpenAd.showOpenAd(
+            back = true,
+            showing = {},
+            close = {
+                finish()
+            }
+        )
     }
 }
